@@ -47,16 +47,22 @@ def _get_ticket_or_404(conn, ticket_id: int):
     return row
 
 
+def _valida_testi_ticket(titolo: Optional[str], descrizione: Optional[str]) -> None:
+    if titolo is not None:
+        if len(titolo.strip()) < 5 or len(titolo) > 120:
+            raise HTTPException(status_code=422, detail="Il titolo deve avere tra 5 e 120 caratteri")
+    if descrizione is not None:
+        if not descrizione.strip():
+            raise HTTPException(status_code=422, detail="La descrizione non puo' essere vuota")
+        if len(descrizione) > 5000:
+            raise HTTPException(status_code=422, detail="La descrizione supera i 5000 caratteri")
+
+
 @app.post("/tickets", response_model=Ticket, status_code=201)
 def crea_ticket(payload: TicketCreate):
     log.info("Nuovo ticket ricevuto: %s", payload.model_dump())
 
-    if len(payload.titolo.strip()) < 5 or len(payload.titolo) > 120:
-        raise HTTPException(status_code=422, detail="Il titolo deve avere tra 5 e 120 caratteri")
-    if not payload.descrizione.strip():
-        raise HTTPException(status_code=422, detail="La descrizione non puo' essere vuota")
-    if len(payload.descrizione) > 5000:
-        raise HTTPException(status_code=422, detail="La descrizione supera i 5000 caratteri")
+    _valida_testi_ticket(payload.titolo, payload.descrizione)
     if "@" not in payload.email_richiedente:
         raise HTTPException(status_code=422, detail="Email del richiedente non valida")
 
@@ -103,14 +109,7 @@ def elenca_ticket(stato: Optional[Stato] = None, q: Optional[str] = None):
 
 @app.patch("/tickets/{ticket_id}", response_model=Ticket)
 def aggiorna_ticket(ticket_id: int, payload: TicketUpdate):
-    if payload.titolo is not None:
-        if len(payload.titolo.strip()) < 5 or len(payload.titolo) > 120:
-            raise HTTPException(status_code=422, detail="Il titolo deve avere tra 5 e 120 caratteri")
-    if payload.descrizione is not None:
-        if not payload.descrizione.strip():
-            raise HTTPException(status_code=422, detail="La descrizione non puo' essere vuota")
-        if len(payload.descrizione) > 5000:
-            raise HTTPException(status_code=422, detail="La descrizione supera i 5000 caratteri")
+    _valida_testi_ticket(payload.titolo, payload.descrizione)
 
     campi = {k: (v.value if hasattr(v, "value") else v) for k, v in payload.model_dump(exclude_none=True).items()}
     with get_conn() as conn:
